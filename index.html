@@ -68,12 +68,18 @@
             <button id="splitLootButton" disabled>Split Loot</button>
             <button id="resetButton" class="reset-button">Reset All</button>
 
+            <div class="server-actions">
+                <button id="syncButton" class="server-button">Sync to Server</button>
+                <button id="loadButton" class="server-button">Load from Server</button>
+            </div>
+
             <div id="resultsPanel" class="hidden">
                 <p>Total Loot: $<span id="finalTotal">0.00</span></p>
                 <p>Loot Per Party Member: $<span id="lootPerMember">0.00</span></p>
             </div>
 
             <p id="splitMessage"></p>
+            <p id="serverMessage"></p>
         </section>
 
         <section class="panel reflection">
@@ -83,8 +89,8 @@
                 My loot array is the source of truth because all loot items are stored there as objects.
                 Each object includes a name, value, and quantity, so the app can calculate value times quantity.
                 The updateUI() function recalculates totals, renders the loot list, and updates what is visible or disabled.
-                Phase 3 adds localStorage so the loot array and party size can be saved and restored after the page reloads.
-                The reset button clears the array, resets party size, removes stored data, and updates the screen immediately.
+                Phase 3 added localStorage so the loot array and party size can be saved and restored after the page reloads.
+                Phase 4 adds server sync so the same state can be sent outside the browser and loaded back after validation.
             </p>
         </section>
     </main>

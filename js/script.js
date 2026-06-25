@@ -1,6 +1,7 @@
 // Aayush Mehmi, 6/24/2026
 
 const STORAGE_KEY = "lootSplitterState";
+const STUDENT_ID = "aayushM";
 
 let loot = [];
 let partySize = 1;
@@ -8,6 +9,8 @@ let partySize = 1;
 document.getElementById("addLootButton").addEventListener("click", addLoot);
 document.getElementById("splitLootButton").addEventListener("click", splitLoot);
 document.getElementById("resetButton").addEventListener("click", resetAll);
+document.getElementById("syncButton").addEventListener("click", syncToServer);
+document.getElementById("loadButton").addEventListener("click", loadFromServer);
 
 document.getElementById("partySize").addEventListener("input", function () {
     const enteredSize = parseInt(document.getElementById("partySize").value);
@@ -24,7 +27,6 @@ restoreState();
 updateUI();
 
 function saveState() {
-
     const appState = {
         loot: loot,
         partySize: partySize
@@ -34,7 +36,6 @@ function saveState() {
 }
 
 function restoreState() {
-
     loot = [];
     partySize = 1;
 
@@ -49,24 +50,15 @@ function restoreState() {
         const parsed = JSON.parse(savedState);
 
         if (typeof parsed === "object" && parsed !== null) {
-
             if (!isNaN(parsed.partySize) && parsed.partySize >= 1) {
                 partySize = parseInt(parsed.partySize);
             }
 
             if (Array.isArray(parsed.loot)) {
-
                 for (let i = 0; i < parsed.loot.length; i++) {
-
                     const item = parsed.loot[i];
 
-                    if (
-                        item.name !== "" &&
-                        !isNaN(item.value) &&
-                        item.value >= 0 &&
-                        !isNaN(item.quantity) &&
-                        item.quantity >= 1
-                    ) {
+                    if (isValidLootItem(item)) {
                         loot.push({
                             name: item.name,
                             value: parseFloat(item.value),
@@ -84,8 +76,19 @@ function restoreState() {
     document.getElementById("partySize").value = partySize;
 }
 
-function addLoot() {
+function isValidLootItem(item) {
+    return (
+        item !== null &&
+        typeof item === "object" &&
+        item.name !== "" &&
+        !isNaN(item.value) &&
+        item.value >= 0 &&
+        !isNaN(item.quantity) &&
+        item.quantity >= 1
+    );
+}
 
+function addLoot() {
     const name = document.getElementById("lootName").value;
     const value = parseFloat(document.getElementById("lootValue").value);
     const quantity = parseInt(document.getElementById("lootQuantity").value);
@@ -126,7 +129,6 @@ function addLoot() {
 }
 
 function removeLoot(index) {
-
     loot.splice(index, 1);
 
     saveState();
@@ -134,26 +136,123 @@ function removeLoot(index) {
 }
 
 function splitLoot() {
-
     updateUI();
 }
 
 function resetAll() {
-
     loot = [];
     partySize = 1;
 
     document.getElementById("partySize").value = partySize;
     document.getElementById("message").textContent = "";
     document.getElementById("splitMessage").textContent = "";
+    document.getElementById("serverMessage").textContent = "";
 
     localStorage.removeItem(STORAGE_KEY);
 
     updateUI();
 }
 
-function updateUI() {
+function syncToServer() {
+    const payload = {
+        studentId: STUDENT_ID,
+        state: {
+            loot: loot,
+            partySize: partySize
+        }
+    };
 
+    fetch("https://goldtop.hopto.org/save/" + STUDENT_ID, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(function (response) {
+        if (!response.ok) {
+            throw new Error("Server sync failed.");
+        }
+
+        return response.json();
+    })
+    .then(function (data) {
+        if (data.status === "saved" && data.studentId === STUDENT_ID) {
+            document.getElementById("serverMessage").textContent =
+                "State synced to server successfully.";
+        } else {
+            document.getElementById("serverMessage").textContent =
+                "Server response was not valid.";
+        }
+    })
+    .catch(function () {
+        document.getElementById("serverMessage").textContent =
+            "Could not sync to server.";
+    });
+}
+
+function loadFromServer() {
+    fetch("https://goldtop.hopto.org/load/" + STUDENT_ID)
+    .then(function (response) {
+        if (!response.ok) {
+            throw new Error("Server load failed.");
+        }
+
+        return response.json();
+    })
+    .then(function (data) {
+        if (data.status === "empty" && data.studentId === STUDENT_ID) {
+            document.getElementById("serverMessage").textContent =
+                "No saved server data was found.";
+            return;
+        }
+
+        if (
+            data.status !== "loaded" ||
+            data.studentId !== STUDENT_ID ||
+            typeof data.state !== "object" ||
+            data.state === null ||
+            !Array.isArray(data.state.loot) ||
+            isNaN(data.state.partySize) ||
+            data.state.partySize < 1
+        ) {
+            document.getElementById("serverMessage").textContent =
+                "Server data was invalid.";
+            return;
+        }
+
+        const validatedLoot = [];
+
+        for (let i = 0; i < data.state.loot.length; i++) {
+            const item = data.state.loot[i];
+
+            if (isValidLootItem(item)) {
+                validatedLoot.push({
+                    name: item.name,
+                    value: parseFloat(item.value),
+                    quantity: parseInt(item.quantity)
+                });
+            }
+        }
+
+        loot = validatedLoot;
+        partySize = parseInt(data.state.partySize);
+
+        document.getElementById("partySize").value = partySize;
+
+        saveState();
+        updateUI();
+
+        document.getElementById("serverMessage").textContent =
+            "State loaded from server successfully.";
+    })
+    .catch(function () {
+        document.getElementById("serverMessage").textContent =
+            "Could not load from server.";
+    });
+}
+
+function updateUI() {
     const lootRows = document.getElementById("lootRows");
 
     let total = 0;
@@ -161,7 +260,6 @@ function updateUI() {
     lootRows.innerHTML = "";
 
     for (let i = 0; i < loot.length; i++) {
-
         total += loot[i].value * loot[i].quantity;
 
         let row = document.createElement("div");
